@@ -1,0 +1,137 @@
+<html>
+<header>
+    <link rel="stylesheet" href="//kendo.cdn.telerik.com/2021.3.1207/styles/kendo.common.min.css"
+          integrity="sha256-+mlHfJkofmJZyybFiorLHHYAOA5Yhcxh8RsynIFz4Wk=" crossorigin="anonymous" />
+    <link rel="stylesheet" href="//kendo.cdn.telerik.com/2021.3.1207/styles/kendo.bootstrap.min.css"
+          integrity="sha256-wJYiT1BUrPob7qijb5rEitklUIQkMXbkXoXAfxFq7dc=" crossorigin="anonymous" />
+    <script src="https://kit.fontawesome.com/3ba25ea486.js" crossorigin="anonymous"></script>
+    <script src="//code.jquery.com/jquery-3.6.3.min.js" integrity="sha256-pvPw+upLPUjgMXY0G+8O0xUf+/Im1MZjXxxgOcBQBXU="
+            crossorigin="anonymous"></script>
+    <script src="//kendo.cdn.telerik.com/2021.3.1207/js/kendo.all.min.js"
+            integrity="sha256-+MsiYUobOPnZfvRGdpTFc3FVoydyja8xwYBhMKC0EXw=" crossorigin="anonymous"></script>
+    <!-- <script src = "https://www.youtube.com/iframe_api"></script> -->
+
+    <style>
+        .btn {
+            height: 2em;
+            width: 5em;
+            transform: scale(2);
+            margin-top: 2em;
+        }
+    </style>
+</header>
+
+<body>
+    <div id="player"></div>
+    <legend>
+        YouTube Dual Monitor
+    </legend>
+    <fieldset>
+        <div id="gridPlaylist"></div>
+        <fieldset>
+            <button id="Prev" title="Go to previous video">
+                <i class="btn btn-default fa-solid fa-backward-step"></i>
+            </button>
+            <button id="Play" title="Play Video from current position">
+                <i class="btn btn-default fa-solid fa-play"></i>
+            </button>
+            <button id="Pause" title="Pause video"><i class="btn btn-default fa-solid fa-pause"></i></button>
+            <button id="Stop" title="Stop video and reset to beginning">
+                <i class="btn btn-default fa-solid fa-stop"></i>
+            </button>
+            <button id="Next" title="Go to next video"><i class="btn btn-default fa-solid fa-forward-step"></i></button>
+            <button id="Open" title="Open Display window"><i class="btn fa-solid fa-arrow-up-right-from-square"></i></i></button>
+        </fieldset>
+    </fieldset>
+</body>
+
+</html>
+<script type="text/javascript" src="js/jquery.timesetter.js"></script>
+
+<script src="js/index.js"></script>
+
+<script>
+    // 2. This code loads the IFrame Player API code asynchronously.
+    var tag = document.createElement('script');
+
+    tag.src = "https://www.youtube.com/iframe_api";
+    var firstScriptTag = document.getElementsByTagName('script')[0];
+    firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+    var player;
+    function onYouTubeIframeAPIReady() {
+        player = new YT.Player('player', {
+            //   height: '390',
+            //   width: '640',
+            //  videoId: 'M7lc1UVf-VE',
+            playerVars: {
+                'playsinline': 1
+            },
+            //   events: {
+            //     'onReady': onPlayerReady,
+            //     'onStateChange': onPlayerStateChange
+            //   }
+        });
+    }
+    //// 4. The API will call this function when the video player is ready.
+    //function onPlayerReady(event) {
+    //  event.target.playVideo();
+    //}
+
+    //// 5. The API calls this function when the player's state changes.
+    ////    The function indicates that when playing a video (state=1),
+    ////    the player should play for six seconds and then stop.
+    //var done = false;
+    //function onPlayerStateChange(event) {
+    //  if (event.data == YT.PlayerState.PLAYING && !done) {
+    //    setTimeout(stopVideo, 6000);
+    //    done = true;
+    //  }
+    //}
+    //function stopVideo() {
+    //  player.stopVideo();
+    //}
+
+    $('#Play').click(() => player.playVideo());
+    $('#Pause').click(() => player.pauseVideo());
+    $('#Stop').click(() => player.stopVideo());
+</script>
+<script src="https://apis.google.com/js/api.js"></script>
+<script>
+    /**
+     * Sample JavaScript code for youtube.videos.list
+     * See instructions for running APIs Explorer code samples locally:
+     * https://developers.google.com/explorer-help/code-samples#javascript
+     */
+
+    function authenticate() {
+        return gapi.auth2.getAuthInstance()
+            .signIn({ scope: "https://www.googleapis.com/auth/youtube.readonly" })
+            .then(function () { console.log("Sign-in successful"); },
+                function (err) { console.error("Error signing in", err); });
+    }
+    function loadClient() {
+        gapi.client.setApiKey("AIzaSyARide-a5tJmlGe64fQQIhx8q0Rd17JV4g");
+        return gapi.client.load("https://www.googleapis.com/discovery/v1/apis/youtube/v3/rest")
+            .then(function () { console.log("GAPI client loaded for API"); },
+                function (err) { console.error("Error loading GAPI client for API", err); });
+    }
+    // Make sure the client is loaded and sign-in is complete before calling this method.
+    function execute() {
+        return gapi.client.youtube.videos.list({
+            "id": [
+                "c9Wg6Cb_YlU"
+            ]
+        })
+            .then(function (response) {
+                // Handle the results here (response.result has the parsed body).
+                console.log("Response", response);
+            },
+                function (err) { console.error("Execute error", err); });
+    }
+    gapi.load("client:auth2", function () {
+        gapi.auth2.init({ client_id: "811751130692-bqa2df4ov7v1p5p5rjpsf5r8etnpnqqb.apps.googleusercontent.com" });
+    });
+</script>
+<button onclick="authenticate().then(loadClient)">authorize and load</button>
+<button onclick="execute()">execute</button>

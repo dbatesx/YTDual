@@ -1,0 +1,197 @@
+<html>
+<header>
+    <link rel="stylesheet" href="//kendo.cdn.telerik.com/2021.3.1207/styles/kendo.common.min.css" />
+    <link rel="stylesheet" href="//kendo.cdn.telerik.com/2021.3.1207/styles/kendo.bootstrap.min.css" />
+
+    <style>
+        .btn {
+            height: 2em;
+            width: 5em;
+            transform: scale(2);
+            margin-top: 2em;
+        }
+    </style>
+</header>
+
+<body>
+    <div id="player"></div>
+    <legend>
+        YouTube Dual Monitor
+    </legend>
+    <fieldset>
+        <div id="gridPlaylist"></div>
+        <fieldset>
+            <button id="Prev" title="Go to previous video"><i
+                    class="btn btn-default fa-solid fa-backward-step"></i></button>
+            <button id="Play" title="Play Video from current position"><i
+                    class="btn btn-default fa-solid fa-play"></i></button>
+            <button id="Pause" title="Pause video"><i class="btn btn-default fa-solid fa-pause"></i></button>
+            <button id="Stop" title="Stop video and reset to beginning"><i
+                    class="btn btn-default fa-solid fa-stop"></i></button>
+            <button id="Next" title="Go to next video"><i class="btn btn-default fa-solid fa-forward-step"></i></button>
+            <button id="Open" title="Open Display window"><i class="btn fa-solid fa-arrow-up-right-from-square"></i></i></button>
+        </fieldset>
+    </fieldset>
+</body>
+
+</html>
+
+<script src="//code.jquery.com/jquery-3.6.3.min.js"></script>
+<script src="https://kit.fontawesome.com/3ba25ea486.js" ></script>
+<script src="//kendo.cdn.telerik.com/2021.3.1207/js/kendo.all.min.js"></script>
+<script src = "https://www.youtube.com/iframe_api"></script>
+<script type="text/javascript" src="js/jquery.timesetter.js"></script>
+
+<script>
+const params = Object.fromEntries(new URLSearchParams(location.search));
+
+var windowDisplay,
+  windowDisplayName = 'VideoDisplay';
+
+// $.ready(function () {
+//  });
+
+    if(localStorage["grid_data"] == undefined){
+        setTestData();
+    }
+
+    function setTestData(){
+        var testData = [];
+        localStorage["grid_data"] = JSON.stringify(testData);
+    }
+    
+    function reset(){
+        setTestData();
+        $("#grid").data("kendoGrid").dataSource.read();
+    }
+
+    var dataSource = new kendo.data.DataSource({
+        transport: {
+          create: function(options){
+            var localData = JSON.parse(localStorage["grid_data"]);
+            if(localData.length)
+              options.data.ID = localData[localData.length-1].ID + 1;
+            else {
+              options.data.ID = 1;
+            }
+            // parse url, get videoID, title, length in seconds:
+            const params = Object.fromEntries(new URLSearchParams(options.data.URL.split('?')[1]));
+            localData.push(options.data);
+            localStorage["grid_data"] = JSON.stringify(localData);
+            options.success(options.data);
+          },
+          read: function(options){
+              var localData = JSON.parse(localStorage["grid_data"]);
+              options.success(localData);
+          },
+          update: function(options){
+            var localData = JSON.parse(localStorage["grid_data"]);
+
+            for(var i=0; i<localData.length; i++){
+              if(localData[i].ID == options.data.ID){
+                localData[i].Value = options.data.Value;
+              }
+            }
+            localStorage["grid_data"] = JSON.stringify(localData);
+            options.success(options.data);
+          },
+          destroy: function(options){
+            var localData = JSON.parse(localStorage["grid_data"]);
+            for(var i=0; i<localData.length; i++){
+                if(localData[i].ID === options.data.ID){
+                    localData.splice(i,1);
+                    break;
+                }
+            }
+            localStorage["grid_data"] = JSON.stringify(localData);
+            options.success(localData);
+          },
+        },
+        schema: {
+          model: {
+            id: "ID",
+            fields: {
+              ID: { type: "number", editable: false },
+              URL: { type: "string" },
+              StartAt: { type: "number" },
+              StopAt: { type: "number"},
+            }}
+        },
+        pageSize: 20
+    });
+
+    var grid = $("#gridPlaylist").kendoGrid({
+        dataSource: dataSource,
+        pageable: true,
+        xheight: 500,
+        toolbar: ["create", "save", "cancel"],
+        columns: [
+          { field: "ID", width: "100px" },
+          { field: "URL", title: "YouTube URL", width: "400px"},
+          { field: "StartAt", title: "Start At", width: "100px"},
+          { field: "StopAt", title: "Stop At", width: "100px"},
+          { command: "destroy" }
+        ],
+        editable: "incell",
+    }).data("kendoGrid");
+// });
+//     $('#PlaylistGrid').kendoGrid({
+//         dataSource: [{Video: '123', Start: '0', Stop: null}],
+//         columns: [
+//             { command: [{ name: "edit", text: "", iconClass: "far fa-edit" }], title: "&nbsp;", width: 40 },
+//             { field: 'Video' },
+//             { field: 'Start' },
+//             { field: 'Stop' },
+//         ],
+// //        editable: 'inline',
+//         editable: 'popup',
+//     });
+
+$('#Open').click(function(){
+  windowDisplay = window.open('', windowDisplayName, 'popup');
+$('body', windowDisplay.document).append($('<div id="player" />'));
+});      // 2. This code loads the IFrame Player API code asynchronously.
+    //   var tag = document.createElement('script');
+
+    //   tag.src = "https://www.youtube.com/iframe_api";
+    //   var firstScriptTag = document.getElementsByTagName('script')[0];
+    //   firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+      var player;
+      function onYouTubeIframeAPIReady() {
+        player = new YT.Player('player', {
+        //   height: '390',
+        //   width: '640',
+          videoId: 'M7lc1UVf-VE',
+          playerVars: {
+            'playsinline': 1
+          },
+        //   events: {
+        //     'onReady': onPlayerReady,
+        //     'onStateChange': onPlayerStateChange
+        //   }
+        });
+      }
+      // 4. The API will call this function when the video player is ready.
+      function onPlayerReady(event) {
+        event.target.playVideo();
+      }
+
+      // 5. The API calls this function when the player's state changes.
+      //    The function indicates that when playing a video (state=1),
+      //    the player should play for six seconds and then stop.
+      var done = false;
+      function onPlayerStateChange(event) {
+        if (event.data == YT.PlayerState.PLAYING && !done) {
+          setTimeout(stopVideo, 6000);
+          done = true;
+        }
+      }
+      function stopVideo() {
+        player.stopVideo();
+      }
+
+$('#Play').click(()=>player.playVideo());
+$('#Pause').click(()=>player.pauseVideo());
+$('#Stop').click(()=>player.stopVideo());
+</script>
