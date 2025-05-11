@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>YouTube Playlist Manager</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link href="https://cdn.jsdelivr.net/npm/vuetify@3.5.6/dist/vuetify.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vuetify@3.5.6/dist/vuetify.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vuetify@3.5.6/dist/vuetify-labs-components.umd.min.js"></script>
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <style>
+        body {
+            margin: 20px;
+            font-family: sans-serif;
+        }
+
+        iframe {
+            border: none;
+        }
+
+        .ytp-pause-overlay {
+            display: none !important;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app"></div>
+
+    <script>
+        const STORAGE_KEYS = {
+            playlist: 'videoPlaylist',
+            apiKey: 'ytApiKey'
+        };
+
+        const App = {
+            template: `
+        <v-app>
+          <v-container fluid>
+            <v-dialog v-model="apiKeyDialog" persistent max-width="500px">
+              <v-card>
+                <v-card-title><strong>YouTube API Key</strong></v-card-title>
+                <v-card-text>
+                  <p>This app uses the YouTube Data API to fetch video info. Please paste your API key below.</p>
+                  <v-text-field v-model="apiKeyInput" label="API Key" required></v-text-field>
+                </v-card-text>
+                <v-card-actions>
+                  <v-spacer></v-spacer>
+                  <v-btn color="primary" @click="saveApiKey">Save</v-btn>
+                </v-card-actions>
+              </v-card>
+            </v-dialog>
+
+            <v-row>
+              <v-col cols="12" md="6">
+                <h2>Playlist</h2>
+                <v-data-table
+                  :headers="headers"
+                  :items="playlist"
+                  item-value="id"
+                  density="comfortable"
+                  @click:row="selectVideo"
+                  class="elevation-1"
+                >
+                  <template #top>
+                    <v-toolbar flat>
+                      <v-toolbar-title>Add Video</v-toolbar-title>
+                      <v-spacer></v-spacer>
+                      <v-dialog v-model="dialog" persistent max-width="500px">
+                        <template #activator="{ props }">
+                          <v-btn v-bind="props" color="primary">New</v-btn>
+                        </template>
+                        <v-card>
+                          <v-card-title>
+                            <span class="text-h6">New Video</span>
+                          </v-card-title>
+                          <v-card-text>
+                            <v-text-field v-model="form.rawInput" label="YouTube URL or ID" @change="onVideoInputChange" required></v-text-field>
+                            <v-text-field v-model="form.title" label="Title" required></v-text-field>
+                            <v-text-field v-model="form.duration" label="Duration" readonly></v-text-field>
+                            <v-textarea v-model="form.description" label="Description"></v-textarea>
+                          </v-card-text>
+                          <v-card-actions>
+                            <v-spacer></v-spacer>
+                            <v-btn text @click="dialog = false">Cancel</v-btn>
+                            <v-btn text @click="addVideo">Save</v-btn>
+                          </v-card-actions>
+                        </v-card>
+                      </v-dialog>
+                    </v-toolbar>
+                  </template>
+                  <template #item.actions="{ item }">
+                        <v-btn icon size="small" @click="togglePlayPause(item)">
+                        <v-icon>{{ isPlaying(item) ? 'mdi-pause-circle' : 'mdi-play-circle' }}</v-icon>
+                        </v-btn>
+                    </template>
+
+                    <template #item.delete="{ item }">
+                        <v-btn icon size="small" @click="deleteVideo(item)">
+                        <v-icon color="red">mdi-delete</v-icon>
+                        </v-btn>
+                    </template>
+                </v-data-table>
+              </v-col>
+              <v-col cols="12" md="6">
+                <h2>Player</h2>
+                <div style="position: relative; padding-bottom: 56.25%; height: 0;">
+                  <div id="player" style="width:100%; height:390px;"></div>
+                </div>
+              </v-col>
+            </v-row>
+          </v-container>
+        </v-app>
+      `,
+            data() {
+                return {
+                    dialog: false,
+                    apiKeyDialog: false,
+                    apiKeyInput: '',
+                    apiKey: '',
+                    form: { rawInput: '', videoId: '', title: '', description: '', duration: '' },
+                    playlist: [],
+                    selectedVideoId: null,
+                    headers: [
+                        { title: '', key: 'actions', sortable: false, width: 50 },
+                        { title: 'Title', key: 'title' },
+                        { title: 'Duration', key: 'duration', width: '100px' },
+                        { title: 'Video ID', key: 'videoId' },
+                        { title: '', key: 'delete', sortable: false, width: 50 }
+                    ],
+                    isVideoPaused: false,
+                    player: null,
+                };
+            },
+            computed: {
+                iframeSrc() {
+                    return this.selectedVideoId
+                        ? `https://www.youtube.com/embed/${this.selectedVideoId}?autoplay=1`
+                        : '';
+                }
+            },
+            methods: {
+                loadPlaylist() {
+                    const raw = localStorage.getItem(STORAGE_KEYS.playlist);
+                    this.playlist = raw ? JSON.parse(raw) : [];
+                },
+                savePlaylist() {
+                    localStorage.setItem(STORAGE_KEYS.playlist, JSON.stringify(this.playlist));
+                },
+                extractVideoId(input) {
+                    try {
+                        const url = new URL(input);
+                        if (url.hostname.includes('youtube.com')) {
+                            return url.searchParams.get('v');
+                        } else if (url.hostname === 'youtu.be') {
+                            return url.pathname.substring(1);
+                        }
+                    } catch {
+                        return input; // assume raw ID
+                    }
+                    return '';
+                },
+                async onVideoInputChange() {
+                    const id = this.extractVideoId(this.form.rawInput.trim());
+                    if (!id) return;
+                    this.form.videoId = id;
+
+                    const apiUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails&id=${id}&key=${this.apiKey}`;
+                    const res = await fetch(apiUrl);
+                    const json = await res.json();
+                    const video = json.items?.[0];
+                    if (video) {
+                        this.form.title = video.snippet.title;
+                        this.form.description = video.snippet.description;
+                        this.form.duration = this.formatDuration(video.contentDetails.duration);
+                    }
+                },
+                formatDuration(iso) {
+                    const match = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+                    const h = match[1] ? match[1].padStart(2, '0') : '00';
+                    const m = match[2] ? match[2].padStart(2, '0') : '00';
+                    const s = match[3] ? match[3].padStart(2, '0') : '00';
+                    return h === '00' ? `${m}:${s}` : `${h}:${m}:${s}`;
+                },
+                addVideo() {
+                    if (!this.form.title || !this.form.videoId) return;
+                    const newVideo = {
+                        id: Date.now(),
+                        title: this.form.title,
+                        videoId: this.form.videoId,
+                        description: this.form.description,
+                        duration: this.form.duration
+                    };
+                    this.playlist.push(newVideo);
+                    this.savePlaylist();
+                    this.form = { rawInput: '', title: '', videoId: '', description: '', duration: '' };
+                    this.dialog = false;
+                },
+                selectVideo({ item }) {
+                    this.selectedVideoId = item.videoId;
+                },
+                checkApiKey() {
+                    const storedKey = localStorage.getItem(STORAGE_KEYS.apiKey);
+                    if (storedKey) {
+                        this.apiKey = storedKey;
+                    } else {
+                        this.apiKeyDialog = true;
+                    }
+                },
+                saveApiKey() {
+                    if (!this.apiKeyInput) return;
+                    this.apiKey = this.apiKeyInput;
+                    localStorage.setItem(STORAGE_KEYS.apiKey, this.apiKeyInput);
+                    this.apiKeyDialog = false;
+                },
+                togglePlayPause(item) {
+                    if (!this.player) return;
+
+                    if (this.selectedVideoId === item.videoId) {
+                        if (this.isVideoPaused) {
+                            this.player.playVideo();
+                        } else {
+                            this.player.pauseVideo();
+                        }
+                        this.isVideoPaused = !this.isVideoPaused;
+                    } else {
+                        this.selectedVideoId = item.videoId;
+                        this.isVideoPaused = false;
+                        this.player.loadVideoById(item.videoId);
+                    }
+                },
+                isPlaying(item) {
+                    return this.selectedVideoId === item.videoId && !this.isVideoPaused;
+                },
+                deleteVideo(item) {
+                    this.playlist = this.playlist.filter(v => v.id !== item.id);
+                    if (this.selectedVideoId === item.videoId) {
+                        this.selectedVideoId = null;
+                    }
+                    this.savePlaylist();
+                }
+
+            },
+            mounted() {
+                this.checkApiKey();
+                this.loadPlaylist();
+
+                // Load YouTube Player API
+                window.onYouTubeIframeAPIReady = () => {
+                    this.player = new YT.Player('player', {
+                        height: '390',
+                        width: '100%',
+                        videoId: '',
+                        events: {
+                            onReady: () => console.log('Player ready'),
+                            onStateChange: this.onPlayerStateChange
+                        }
+                    });
+                };
+            }
+        };
+
+        const vuetify = Vuetify.createVuetify();
+        Vue.createApp(App).use(vuetify).mount('#app');
+    </script>
+</body>
+
+</html>
